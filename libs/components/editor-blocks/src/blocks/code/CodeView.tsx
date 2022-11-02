@@ -39,15 +39,17 @@ import { yaml } from '@codemirror/legacy-modes/mode/yaml';
 import { Extension } from '@codemirror/state';
 import {
     BlockPendantProvider,
-    useOnSelect,
+    useOnSelectActive,
 } from '@toeverything/components/editor-core';
 import { DuplicateIcon } from '@toeverything/components/icons';
 import { Option, Select, styled } from '@toeverything/components/ui';
 import { CreateView } from '@toeverything/framework/virgo';
 import { copyToClipboard } from '@toeverything/utils';
+
 import { elixir } from 'codemirror-lang-elixir';
 import { useEffect, useRef, useState } from 'react';
 import { StyleWithAtRules } from 'style9';
+
 import CodeMirror, { ReactCodeMirrorRef } from './CodeMirror';
 
 interface CreateCodeView extends CreateView {
@@ -114,7 +116,7 @@ const CodeBlock = styled('div')(({ theme }) => ({
         flexWrap: 'wrap',
         justifyContent: 'space-between',
         opacity: 0,
-        transition: 'opacity 1.5s',
+        transition: 'opacity .15s',
     },
     '.copy-block': {
         padding: '0px 10px',
@@ -137,17 +139,30 @@ const CodeBlock = styled('div')(({ theme }) => ({
         outline: 'none !important',
     },
 }));
+const StyledOperationalPanel = styled('div')<{ show: boolean }>(({ show }) => {
+    return {
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        opacity: show ? 1 : 0,
+        transition: 'opacity .15s',
+    };
+});
 export const CodeView = ({ block, editor }: CreateCodeView) => {
     const initValue: string = block.getProperty('text')?.value?.[0]?.text;
     const langType: string = block.getProperty('lang');
     const [extensions, setExtensions] = useState<Extension[]>();
+    const [showOperationPanel, setShowOperationPanel] = useState(false);
+    const [selectOpen, setSelectOpen] = useState(false);
+    const isSelecting = useRef(false);
     const codeMirror = useRef<ReactCodeMirrorRef>();
     const focusCode = () => {
         if (codeMirror.current) {
             codeMirror?.current?.view?.focus();
         }
     };
-    useOnSelect(block.id, (_is_select: boolean) => {
+    //TODO listen codeMirror.up down event , active
+    useOnSelectActive(block.id, () => {
         focusCode();
     });
     const onChange = (value: string) => {
@@ -157,13 +172,10 @@ export const CodeView = ({ block, editor }: CreateCodeView) => {
     };
     const handleLangChange = (lang: string) => {
         block.setProperty('lang', lang);
-        setExtensions([langs[lang]()]);
+        langs[lang] && setExtensions([langs[lang]()]);
     };
     useEffect(() => {
         handleLangChange(langType ? langType : DEFAULT_LANG);
-        setTimeout(() => {
-            focusCode();
-        }, 100);
     }, []);
 
     const copyCode = () => {
@@ -181,8 +193,16 @@ export const CodeView = ({ block, editor }: CreateCodeView) => {
                 onKeyDown={e => {
                     e.stopPropagation();
                 }}
+                onMouseEnter={() => {
+                    isSelecting.current = false;
+                    setShowOperationPanel(true);
+                }}
+                onMouseLeave={() => {
+                    setSelectOpen(false);
+                    !isSelecting.current && setShowOperationPanel(false);
+                }}
             >
-                <div className="operation">
+                <StyledOperationalPanel show={showOperationPanel}>
                     <div className="select">
                         <Select
                             width={128}
@@ -192,6 +212,11 @@ export const CodeView = ({ block, editor }: CreateCodeView) => {
                             onChange={(selectedValue: string) => {
                                 handleLangChange(selectedValue);
                             }}
+                            onListboxOpenChange={open => {
+                                setSelectOpen(open);
+                                isSelecting.current = true;
+                            }}
+                            open={selectOpen}
                         >
                             {Object.keys(langs).map(item => {
                                 return (
@@ -208,7 +233,7 @@ export const CodeView = ({ block, editor }: CreateCodeView) => {
                             Copy
                         </div>
                     </div>
-                </div>
+                </StyledOperationalPanel>
 
                 <CodeMirror
                     ref={codeMirror}

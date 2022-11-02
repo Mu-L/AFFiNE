@@ -4,16 +4,17 @@ import {
     SideBarViewCloseIcon,
     SideBarViewIcon,
 } from '@toeverything/components/icons';
-import { IconButton, styled } from '@toeverything/components/ui';
+import { IconButton, styled, Tooltip } from '@toeverything/components/ui';
+import { useTranslation } from '@toeverything/datasource/i18n';
 import {
     useCurrentEditors,
     useLocalTrigger,
     useShowSettingsSidebar,
 } from '@toeverything/datasource/state';
-import { useCallback, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EditorBoardSwitcher } from './EditorBoardSwitcher';
 import { fsApiSupported } from './FileSystem';
+import { Logo } from './Logo';
 import { CurrentPageTitle } from './Title';
 
 export const LayoutHeader = () => {
@@ -21,6 +22,23 @@ export const LayoutHeader = () => {
     const { toggleSettingsSidebar: toggleInfoSidebar, showSettingsSidebar } =
         useShowSettingsSidebar();
     const { t } = useTranslation();
+
+    // because of header not compatible with small screen, hide the mode switcher in that case, this will be optimize in future.
+    const [hideSwitcher, setHideSwither] = useState(false);
+    const [rootEle, setRootEle] = useState<HTMLDivElement>();
+    useEffect(() => {
+        if (rootEle) {
+            const observer = new ResizeObserver(entries => {
+                setHideSwither(entries[0].contentRect.width < 970);
+            });
+            observer.observe(rootEle);
+
+            return () => {
+                observer.disconnect();
+            };
+        }
+        return undefined;
+    }, [rootEle]);
 
     const warningTips = useMemo(() => {
         if (!fsApiSupported()) {
@@ -41,26 +59,38 @@ export const LayoutHeader = () => {
     }, [currentEditors]);
 
     return (
-        <StyledContainerForHeaderRoot>
+        <StyledContainerForHeaderRoot ref={setRootEle}>
             <StyledHeaderRoot>
                 <FlexContainer>
-                    <StyledLogoIcon />
+                    <Logo />
                     <TitleContainer>
                         <CurrentPageTitle />
                     </TitleContainer>
                 </FlexContainer>
                 <FlexContainer>
                     <StyledHelper>
-                        <StyledShare disabled={true}>{t('Share')}</StyledShare>
+                        <Tooltip
+                            placement="bottom-end"
+                            content="Share function coming soon..."
+                        >
+                            <StyledShare disabled={true}>
+                                {t('Share')}
+                            </StyledShare>
+                        </Tooltip>
                         <div style={{ margin: '0px 12px' }}>
-                            <IconButton
-                                size="large"
-                                hoverColor={'transparent'}
-                                onClick={handleSearch}
-                                disabled={true}
+                            <Tooltip
+                                placement="bottom-end"
+                                content="Search function coming soon..."
                             >
-                                <SearchIcon />
-                            </IconButton>
+                                <IconButton
+                                    size="large"
+                                    hoverColor={'transparent'}
+                                    onClick={handleSearch}
+                                    disabled={true}
+                                >
+                                    <SearchIcon />
+                                </IconButton>
+                            </Tooltip>
                         </div>
 
                         <IconButton onClick={toggleInfoSidebar} size="large">
@@ -72,9 +102,11 @@ export const LayoutHeader = () => {
                         </IconButton>
                     </StyledHelper>
                 </FlexContainer>
-                <StyledContainerForEditorBoardSwitcher>
-                    <EditorBoardSwitcher />
-                </StyledContainerForEditorBoardSwitcher>
+                {hideSwitcher ? null : (
+                    <StyledContainerForEditorBoardSwitcher>
+                        <EditorBoardSwitcher />
+                    </StyledContainerForEditorBoardSwitcher>
+                )}
             </StyledHeaderRoot>
         </StyledContainerForHeaderRoot>
     );
@@ -121,7 +153,7 @@ const StyledHeaderRoot = styled('div')(({ theme }) => {
     };
 });
 
-const FlexContainer = styled('div')({ display: 'flex' });
+const FlexContainer = styled('div')({ display: 'flex', alignItems: 'center' });
 
 const TitleContainer = styled('div')(({ theme }) => {
     return {

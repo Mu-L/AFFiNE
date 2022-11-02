@@ -5,6 +5,7 @@ import {
     type ForwardedRef,
     type ReactNode,
     type RefAttributes,
+    useEffect,
 } from 'react';
 /* eslint-disable no-restricted-imports */
 import SelectUnstyled, {
@@ -15,13 +16,13 @@ import SelectUnstyled, {
 import PopperUnstyled from '@mui/base/PopperUnstyled';
 import { ArrowDropDownIcon } from '@toeverything/components/icons';
 import { styled } from '../styled';
-
 type ExtendSelectProps = {
     // Width is always used custom, it will be set to root button and popover
     width?: number | string;
     style?: CSSProperties;
     listboxStyle?: CSSProperties;
     placeholder?: ReactNode;
+    open?: boolean;
 };
 
 /**
@@ -40,8 +41,18 @@ export const Select = forwardRef(function CustomSelect<TValue>(
     props: ExtendSelectProps & SelectUnstyledProps<TValue>,
     ref: ForwardedRef<HTMLUListElement>
 ) {
+    const {
+        width = '100%',
+        style,
+        listboxStyle,
+        placeholder,
+        onListboxOpenChange,
+        onChange,
+        open: propsOpen,
+    } = props;
+    const openControlledByProps = propsOpen !== undefined;
     const [isOpen, setIsOpen] = useState(false);
-    const { width = '100%', style, listboxStyle, placeholder } = props;
+
     const components: SelectUnstyledProps<TValue>['components'] = {
         // Root: generateStyledRoot({ width, ...style }),
         Root: forwardRef((rootProps, rootRef) => {
@@ -80,14 +91,15 @@ export const Select = forwardRef(function CustomSelect<TValue>(
 
     return (
         <SelectUnstyled
-            listboxOpen={isOpen}
-            onListboxOpenChange={() => {
-                setIsOpen(true);
-            }}
             {...props}
+            listboxOpen={openControlledByProps ? propsOpen : isOpen}
+            onListboxOpenChange={open => {
+                !openControlledByProps && setIsOpen(open);
+                onListboxOpenChange?.(open);
+            }}
             onChange={v => {
-                setIsOpen(false);
-                props.onChange && props.onChange(v);
+                !openControlledByProps && setIsOpen(false);
+                onChange?.(v);
             }}
             ref={ref}
             components={components}

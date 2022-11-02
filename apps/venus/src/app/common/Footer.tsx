@@ -2,16 +2,17 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { useTranslation } from 'react-i18next';
 
-import { Box, Button, Grid, Typography } from '@mui/joy';
+import { Box, Button, Grid, styled, Typography } from '@mui/joy';
 
 import GitHubIcon from '@mui/icons-material/GitHub';
 import RedditIcon from '@mui/icons-material/Reddit';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import TwitterIcon from '@mui/icons-material/Twitter';
 
+import { LogoIcon } from '@toeverything/components/icons';
 import { DiscordIcon, GitHub } from '../Icons';
-import LogoImage from '../logo.png';
-import { AFFiNEImage } from './index';
+// import LogoImage from '../logo.png';
+// import { AFFiNEImage } from './index';
 
 export const AFFiNEFooter = ({
     keepupdate = true,
@@ -30,9 +31,12 @@ export const AFFiNEFooter = ({
                                 display: 'flex',
                                 justifyContent: 'center',
                                 margin: 'auto',
+                                color: '#3E6FDB',
+                                marginBottom: '60px',
                             }}
                         >
-                            <AFFiNEImage src={LogoImage} alt="AFFiNE Logo" />
+                            <LogoIcon style={{ fontSize: '160px' }} />
+                            {/* <AFFiNEImage src={LogoImage} alt="AFFiNE Logo" /> */}
                         </Box>
                     </Grid>
                     <Grid xs={12} sx={{ display: 'flex' }}>
@@ -90,13 +94,14 @@ export const AFFiNEFooter = ({
                 sx={{
                     display: 'flex',
                     justifyContent: 'center',
-                    maxWidth: '400px',
+                    flexWrap: 'wrap',
+                    maxWidth: '420px',
                     margin: 'auto',
                     marginBottom: '2em',
                     '--joy-shadow-sm': 0,
                 }}
             >
-                <Box sx={{ display: 'flex', width: '100%' }}>
+                <Box sx={{ display: 'flex', width: '84px' }}>
                     <Button
                         variant="plain"
                         sx={{
@@ -144,7 +149,7 @@ export const AFFiNEFooter = ({
                         </Grid>
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', width: '100%' }}>
+                <Box sx={{ display: 'flex', width: '84px' }}>
                     <Button
                         variant="plain"
                         sx={{
@@ -190,7 +195,7 @@ export const AFFiNEFooter = ({
                         </Grid>
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', width: '100%' }}>
+                <Box sx={{ display: 'flex', width: '84px' }}>
                     <Button
                         variant="plain"
                         sx={{
@@ -239,7 +244,7 @@ export const AFFiNEFooter = ({
                 <Box
                     sx={{
                         display: 'flex',
-                        width: '100%',
+                        width: '84px',
                     }}
                 >
                     <Button
@@ -285,7 +290,7 @@ export const AFFiNEFooter = ({
                         </Grid>
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', width: '100%' }}>
+                <Box sx={{ display: 'flex', width: '84px' }}>
                     <Button
                         variant="plain"
                         sx={{
@@ -356,7 +361,14 @@ export const AFFiNEFooter = ({
                         >
                             #OpenSource
                         </span>
-                        company
+                        <span>software, built with&nbsp;</span>
+                        <StyledLink
+                            href="https://block-suite.com"
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            BlockSuite
+                        </StyledLink>
                     </Typography>
                 </Box>
             </Grid>
@@ -371,10 +383,20 @@ export const AFFiNEFooter = ({
                     }}
                 >
                     <Typography sx={{ display: 'flex', color: '#888' }}>
-                        Copyright © 2022 AFFiNE.
+                        Copyright &copy; 2022 Toeverything
                     </Typography>
                 </Box>
             </Grid>
         </>
     );
 };
+
+const StyledLink = styled('a')({
+    fontWeight: '900',
+    color: '#000',
+    textDecoration: 'none',
+
+    '&:hover': {
+        textDecoration: 'underline',
+    },
+});

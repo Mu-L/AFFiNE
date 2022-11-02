@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import { CustomText, TextProps } from '@toeverything/components/common';
 import {
     BlockPendantProvider,
@@ -11,9 +9,11 @@ import {
 import { styled } from '@toeverything/components/ui';
 import { Protocol } from '@toeverything/datasource/db-service';
 import { CreateView } from '@toeverything/framework/virgo';
+import { useState } from 'react';
 import { BlockContainer } from '../../components/BlockContainer';
 import { TextManage } from '../../components/text-manage';
 import { dedentBlock, tabBlock } from '../../utils/indent';
+
 interface CreateTextView extends CreateView {
     // TODO: need to optimize
     containerClassName?: string;
@@ -90,13 +90,32 @@ export const TextView = ({
         await block.removeChildren();
         await block.after(nextBlock);
 
-        editor.selectionManager.activeNodeByNodeId(nextBlock.id);
+        setTimeout(() => {
+            editor.selectionManager.activeNodeByNodeId(nextBlock.id, 'start');
+        });
         return true;
     };
 
     const onBackspace: TextProps['handleBackSpace'] = editor.withBatch(
         async props => {
             const { isCollAndStart } = props;
+            const activeBlockIds =
+                editor.selectionManager.getSelectedNodesIds();
+
+            // when only one group selected , remove this group block
+            if (activeBlockIds && activeBlockIds.length === 1) {
+                const activeBlock = await editor.getBlockById(
+                    activeBlockIds[0]
+                );
+
+                if (
+                    activeBlock &&
+                    activeBlock.type === Protocol.Block.Type.group
+                ) {
+                    await activeBlock.remove();
+                    return true;
+                }
+            }
             if (!isCollAndStart) {
                 return false;
             }
@@ -228,6 +247,9 @@ export const TextView = ({
         await block.setProperty('text', {
             value: options?.['text'] as CustomText[],
         });
+        setTimeout(async () => {
+            await editor.selectionManager.activeNodeByNodeId(block.id);
+        }, 100);
         block.firstCreateFlag = true;
     };
     const onTab: TextProps['handleTab'] = async ({ isShiftKey }) => {

@@ -118,7 +118,7 @@ export const CommandMenu = ({ editor, hooks, style }: CommandMenuProps) => {
                                 ?.getRangeAt(0)
                                 ?.getBoundingClientRect();
                         if (rect) {
-                            let rectTop = rect.top;
+                            const rectTop = rect.top;
                             const clientHeight =
                                 document.documentElement.clientHeight;
 
@@ -211,6 +211,8 @@ export const CommandMenu = ({ editor, hooks, style }: CommandMenuProps) => {
 
     const handleSelected = async (type: BlockFlavorKeys | string) => {
         const text = await editor.commands.textCommands.getBlockText(blockId);
+        const block = await editor.getBlockById(blockId);
+        const textValue = block.getProperty('text').value;
         editor.blockHelper.removeSearchSlash(blockId, true);
         if (type.startsWith('Virgo')) {
             const handler =
@@ -223,12 +225,18 @@ export const CommandMenu = ({ editor, hooks, style }: CommandMenuProps) => {
             } else {
                 await commonCommandMenuHandler(blockId, type, editor);
             }
-            const block = await editor.getBlockById(blockId);
-            let nextBlock = await block.nextSibling();
-            editor.selectionManager.activeNodeByNodeId(nextBlock.id);
-            if (block.blockProvider.isEmpty()) {
-                block.remove();
-            }
+            const nextBlock = await block.nextSibling();
+            setTimeout(() => {
+                editor.selectionManager.activeNodeByNodeId(nextBlock.id);
+                if (textValue.length === 1) {
+                    block.remove();
+                } else {
+                    block.setProperty('text', {
+                        //@ts-ignore
+                        value: textValue.filter(text => !text.search),
+                    });
+                }
+            }, 100);
         } else {
             if (Protocol.Block.Type[type as BlockFlavorKeys]) {
                 const block = await editor.commands.blockCommands.convertBlock(
@@ -253,23 +261,21 @@ export const CommandMenu = ({ editor, hooks, style }: CommandMenuProps) => {
         >
             {show ? (
                 <MuiClickAwayListener onClickAway={handleClickAway}>
-                    <div>
-                        <CommandMenuContainer
-                            editor={editor}
-                            hooks={hooks}
-                            style={{
-                                ...commandMenuPosition,
-                                ...style,
-                            }}
-                            isShow={show}
-                            blockId={blockId}
-                            onSelected={handleSelected}
-                            onclose={handleClose}
-                            searchBlocks={searchBlocks}
-                            types={types}
-                            categories={categories}
-                        />
-                    </div>
+                    <CommandMenuContainer
+                        editor={editor}
+                        hooks={hooks}
+                        style={{
+                            ...commandMenuPosition,
+                            ...style,
+                        }}
+                        isShow={show}
+                        blockId={blockId}
+                        onSelected={handleSelected}
+                        onclose={handleClose}
+                        searchBlocks={searchBlocks}
+                        types={types}
+                        categories={categories}
+                    />
                 </MuiClickAwayListener>
             ) : (
                 <></>

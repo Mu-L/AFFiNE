@@ -5,8 +5,9 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as syncProtocol from 'y-protocols/sync';
 
 import { Message } from './handler';
+import { KeckProvider } from './keckprovider';
 import { readMessage } from './processor';
-import { WebsocketProvider } from './provider';
+import { WebsocketProvider } from './wsprovider';
 
 enum WebSocketState {
     disconnected = 0,
@@ -46,14 +47,14 @@ const _getToken = async (
     return resp.json();
 };
 
-const _getTimeout = (provider: WebsocketProvider) =>
+const _getTimeout = (provider: WebsocketProvider | KeckProvider) =>
     math.min(
         math.pow(2, provider.wsUnsuccessfulReconnects) * 100,
         provider.maxBackOffTime
     );
 
 export const registerWebsocket = (
-    provider: WebsocketProvider,
+    provider: WebsocketProvider | KeckProvider,
     token: string,
     resync = -1,
     reconnect = 3,
@@ -63,6 +64,26 @@ export const registerWebsocket = (
     let lastMessageReceived = 0;
 
     let websocket: WebSocket | undefined = undefined;
+
+    const broadcastMessage = (buf: ArrayBuffer) => {
+        if (state === WebSocketState.connected) {
+            websocket?.send(buf);
+        }
+    };
+
+    const disconnect = () => {
+        if (websocket != null) {
+            websocket.close();
+            websocket = undefined;
+            state = WebSocketState.disconnected;
+            if (resyncInterval !== 0) {
+                clearInterval(resyncInterval);
+            }
+            clearInterval(checkInterval);
+        }
+    };
+
+    const ret = { broadcastMessage, disconnect };
 
     _getToken(
         provider.url,
@@ -105,13 +126,19 @@ export const registerWebsocket = (
                     state = WebSocketState.disconnected;
                     provider.synced = false;
                     // update awareness (all users except local left)
-                    awarenessProtocol.removeAwarenessStates(
-                        provider.awareness,
-                        Array.from(
-                            provider.awareness.getStates().keys()
-                        ).filter(client => client !== provider.doc.clientID),
-                        provider
-                    );
+
+                    const awareness = (provider as any)['awareness'];
+                    if (awareness) {
+                        awarenessProtocol.removeAwarenessStates(
+                            awareness,
+                            Array.from(awareness.getStates().keys()).filter(
+                                (client): client is number =>
+                                    client !== provider.doc.clientID
+                            ),
+                            provider
+                        );
+                    }
+
                     provider.emit('status', [{ status: 'disconnected' }]);
                 } else {
                     provider.wsUnsuccessfulReconnects++;
@@ -119,15 +146,26 @@ export const registerWebsocket = (
                 if (reconnect <= 0) provider.emit('lost-connection', []);
                 // Start with no reconnect timeout and increase timeout by
                 // using exponential backoff starting with 100ms
-                setTimeout(
-                    registerWebsocket,
-                    _getTimeout(provider),
-                    provider,
-                    token,
-                    resyncInterval,
-                    reconnect > 0 ? reconnect - 1 : 3,
-                    protocol
-                );
+                setTimeout(() => {
+                    const newRet = registerWebsocket(
+                        provider,
+                        token,
+                        resyncInterval,
+                        reconnect > 0 ? reconnect - 1 : 3,
+                        protocol
+                    );
+                    ret.broadcastMessage = newRet.broadcastMessage;
+                    ret.disconnect = newRet.disconnect;
+                }, _getTimeout(provider));
+                // setTimeout(
+                //     registerWebsocket,
+                //     _getTimeout(provider),
+                //     provider,
+                //     token,
+                //     resyncInterval,
+                //     reconnect > 0 ? reconnect - 1 : 3,
+                //     protocol
+                // );
             };
             websocket.onopen = () => {
                 lastMessageReceived = time.getUnixTime();
@@ -139,8 +177,10 @@ export const registerWebsocket = (
                 encoding.writeVarUint(encoder, Message.sync);
                 syncProtocol.writeSyncStep1(encoder, provider.doc);
                 websocket?.send(encoding.toUint8Array(encoder));
+
+                const awareness = (provider as any)['awareness'];
                 // broadcast local awareness state
-                if (provider.awareness.getLocalState() !== null) {
+                if (awareness && awareness.getLocalState() !== null) {
                     const encoderAwarenessState = encoding.createEncoder();
                     encoding.writeVarUint(
                         encoderAwarenessState,
@@ -148,10 +188,9 @@ export const registerWebsocket = (
                     );
                     encoding.writeVarUint8Array(
                         encoderAwarenessState,
-                        awarenessProtocol.encodeAwarenessUpdate(
-                            provider.awareness,
-                            [provider.doc.clientID]
-                        )
+                        awarenessProtocol.encodeAwarenessUpdate(awareness, [
+                            provider.doc.clientID,
+                        ])
                     );
                     websocket?.send(
                         encoding.toUint8Array(encoderAwarenessState)
@@ -164,14 +203,24 @@ export const registerWebsocket = (
         .catch(err => {
             provider.emit('lost-connection', []);
             provider.wsUnsuccessfulReconnects++;
-            setTimeout(
-                registerWebsocket,
-                _getTimeout(provider),
-                provider,
-                token,
-                resyncInterval,
-                reconnect > 0 ? reconnect - 1 : 3
-            );
+            setTimeout(() => {
+                const newRet = registerWebsocket(
+                    provider,
+                    token,
+                    resyncInterval,
+                    reconnect > 0 ? reconnect - 1 : 3
+                );
+                ret.broadcastMessage = newRet.broadcastMessage;
+                ret.disconnect = newRet.disconnect;
+            }, _getTimeout(provider));
+            // setTimeout(
+            //     registerWebsocket,
+            //     _getTimeout(provider),
+            //     provider,
+            //     token,
+            //     resyncInterval,
+            //     reconnect > 0 ? reconnect - 1 : 3
+            // );
         });
 
     let resyncInterval = 0;
@@ -198,23 +247,5 @@ export const registerWebsocket = (
         }
     }, WEBSOCKET_RECONNECT / 10);
 
-    const broadcastMessage = (buf: ArrayBuffer) => {
-        if (state === WebSocketState.connected) {
-            websocket?.send(buf);
-        }
-    };
-
-    const disconnect = () => {
-        if (websocket != null) {
-            websocket.close();
-            websocket = undefined;
-            state = WebSocketState.disconnected;
-            if (resyncInterval !== 0) {
-                clearInterval(resyncInterval);
-            }
-            clearInterval(checkInterval);
-        }
-    };
-
-    return { broadcastMessage, disconnect };
+    return ret;
 };

@@ -11,6 +11,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 const Style9Plugin = require('style9/webpack');
 
 const enableBundleAnalyzer = process.env.BUNDLE_ANALYZER;
+const embedHeaderScript = process.env.AFFINE_EMBED_HEADER;
 
 module.exports = function (webpackConfig) {
     const config = getNxWebpackConfig(webpackConfig);
@@ -163,6 +164,9 @@ module.exports = function (webpackConfig) {
         ),
         new webpack.DefinePlugin({
             JWT_DEV: !isProd,
+            'process.env.AFFINE_FEATURE_FLAG_TOKEN': JSON.stringify(
+                process.env['AFFINE_FEATURE_FLAG_TOKEN']
+            ),
             global: {},
         }),
         isProd &&
@@ -175,6 +179,7 @@ module.exports = function (webpackConfig) {
                 ), //favicon path
                 template: path.resolve(__dirname, './src/template.html'),
                 publicPath: '/',
+                embedHeaderScript,
             }),
         new Style9Plugin(),
         isProd &&
@@ -198,10 +203,10 @@ module.exports = function (webpackConfig) {
             new BundleAnalyzerPlugin({ analyzerMode: 'static' }),
     ].filter(Boolean);
 
-    // Workaround for webpack infinite recompile errors
     config.watchOptions = {
         // followSymlinks: false,
-        ignored: ['**/*.css'],
+        // Ignore css to workaround webpack infinite recompile errors
+        ignored: ['**/node_modules', '**/*.css'],
     };
 
     return config;
