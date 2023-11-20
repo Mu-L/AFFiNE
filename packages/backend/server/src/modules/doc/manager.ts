@@ -8,7 +8,13 @@ import {
 import { Snapshot, Update } from '@prisma/client';
 import { chunk } from 'lodash-es';
 import { defer, retry } from 'rxjs';
-import { applyUpdate, Doc, encodeStateAsUpdate, encodeStateVector } from 'yjs';
+import {
+  applyUpdate,
+  Doc,
+  encodeStateAsUpdate,
+  encodeStateVector,
+  transact,
+} from 'yjs';
 
 import { Config } from '../../config';
 import { Metrics } from '../../metrics/metrics';
@@ -30,6 +36,14 @@ function compare(yBinary: Buffer, jwstBinary: Buffer, strict = false): boolean {
   const yBinary2 = Buffer.from(encodeStateAsUpdate(doc));
 
   return compare(yBinary, yBinary2, true);
+}
+
+function isEmptyBuffer(buf: Buffer): boolean {
+  return (
+    buf.length == 0 ||
+    // 0x0000
+    (buf.length === 2 && buf[0] === 0 && buf[1] === 0)
+  );
 }
 
 const MAX_SEQ_NUM = 0x3fffffff; // u31
@@ -70,22 +84,24 @@ export class DocManager implements OnModuleInit, OnModuleDestroy {
 
   protected recoverDoc(...updates: Buffer[]): Promise<Doc> {
     const doc = new Doc();
-    const chunks = chunk(updates, 100);
+    const chunks = chunk(updates, 10);
 
     return new Promise(resolve => {
       const next = () => {
         const updates = chunks.shift();
         if (updates?.length) {
-          updates.forEach(u => {
-            try {
-              applyUpdate(doc, u);
-            } catch (e) {
-              this.logger.error(
-                `Failed to apply update: ${updates
-                  .map(u => u.toString('hex'))
-                  .join('\n')}`
-              );
-            }
+          transact(doc, () => {
+            updates.forEach(u => {
+              try {
+                applyUpdate(doc, u);
+              } catch (e) {
+                this.logger.error(
+                  `Failed to apply update: ${updates
+                    .map(u => u.toString('hex'))
+                    .join('\n')}`
+                );
+              }
+            });
           });
 
           // avoid applying too many updates in single round which will take the whole cpu time like dead lock
@@ -193,6 +209,9 @@ export class DocManager implements OnModuleInit, OnModuleDestroy {
       defer(async () => {
         const seq = await this.getUpdateSeq(workspaceId, guid);
         await this.db.update.create({
+          select: {
+            seq: true,
+          },
           data: {
             workspaceId,
             id: guid,
@@ -347,8 +366,9 @@ export class DocManager implements OnModuleInit, OnModuleDestroy {
   protected async autoSquash() {
     // find the first update and batch process updates with same id
     const first = await this.db.update.findFirst({
-      orderBy: {
-        createdAt: 'asc',
+      select: {
+        id: true,
+        workspaceId: true,
       },
     });
 
@@ -377,7 +397,15 @@ export class DocManager implements OnModuleInit, OnModuleDestroy {
   ) {
     const blob = Buffer.from(encodeStateAsUpdate(doc));
     const state = Buffer.from(encodeStateVector(doc));
-    return this.db.snapshot.upsert({
+
+    if (isEmptyBuffer(blob)) {
+      return;
+    }
+
+    await this.db.snapshot.upsert({
+      select: {
+        seq: true,
+      },
       where: {
         id_workspaceId: {
           id: guid,

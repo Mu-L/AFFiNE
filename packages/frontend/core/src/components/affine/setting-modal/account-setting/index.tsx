@@ -16,6 +16,7 @@ import { useMutation, useQuery } from '@affine/workspace/affine/gql';
 import { ArrowRightSmallIcon, CameraIcon } from '@blocksuite/icons';
 import { Avatar } from '@toeverything/components/avatar';
 import { Button } from '@toeverything/components/button';
+import { useAsyncCallback } from '@toeverything/hooks/affine-async-hooks';
 import { validateAndReduceImage } from '@toeverything/hooks/use-block-suite-workspace-avatar-url';
 import bytes from 'bytes';
 import { useSetAtom } from 'jotai';
@@ -50,7 +51,7 @@ export const UserAvatar = () => {
     mutation: removeAvatarMutation,
   });
 
-  const handleUpdateUserAvatar = useCallback(
+  const handleUpdateUserAvatar = useAsyncCallback(
     async (file: File) => {
       try {
         const reducedFile = await validateAndReduceImage(file);
@@ -121,48 +122,46 @@ export const AvatarAndName = () => {
   }, [allowUpdate, input, user]);
 
   return (
-    <>
-      <SettingRow
-        name={t['com.affine.settings.profile']()}
-        desc={t['com.affine.settings.profile.message']()}
-        spreadCol={false}
-      >
-        <FlexWrapper style={{ margin: '12px 0 24px 0' }} alignItems="center">
-          <Suspense>
-            <UserAvatar />
-          </Suspense>
+    <SettingRow
+      name={t['com.affine.settings.profile']()}
+      desc={t['com.affine.settings.profile.message']()}
+      spreadCol={false}
+    >
+      <FlexWrapper style={{ margin: '12px 0 24px 0' }} alignItems="center">
+        <Suspense>
+          <UserAvatar />
+        </Suspense>
 
-          <div className={style.profileInputWrapper}>
-            <label>{t['com.affine.settings.profile.name']()}</label>
-            <FlexWrapper alignItems="center">
-              <Input
-                defaultValue={input}
-                data-testid="user-name-input"
-                placeholder={t['com.affine.settings.profile.placeholder']()}
-                maxLength={64}
-                minLength={0}
-                width={280}
-                height={28}
-                onChange={setInput}
-                onEnter={handleUpdateUserName}
-              />
-              {allowUpdate ? (
-                <Button
-                  data-testid="save-user-name"
-                  onClick={handleUpdateUserName}
-                  className={style.button}
-                  style={{
-                    marginLeft: '12px',
-                  }}
-                >
-                  {t['com.affine.editCollection.save']()}
-                </Button>
-              ) : null}
-            </FlexWrapper>
-          </div>
-        </FlexWrapper>
-      </SettingRow>
-    </>
+        <div className={style.profileInputWrapper}>
+          <label>{t['com.affine.settings.profile.name']()}</label>
+          <FlexWrapper alignItems="center">
+            <Input
+              defaultValue={input}
+              data-testid="user-name-input"
+              placeholder={t['com.affine.settings.profile.placeholder']()}
+              maxLength={64}
+              minLength={0}
+              width={280}
+              height={28}
+              onChange={setInput}
+              onEnter={handleUpdateUserName}
+            />
+            {allowUpdate ? (
+              <Button
+                data-testid="save-user-name"
+                onClick={handleUpdateUserName}
+                className={style.button}
+                style={{
+                  marginLeft: '12px',
+                }}
+              >
+                {t['com.affine.editCollection.save']()}
+              </Button>
+            ) : null}
+          </FlexWrapper>
+        </div>
+      </FlexWrapper>
+    </SettingRow>
   );
 };
 
